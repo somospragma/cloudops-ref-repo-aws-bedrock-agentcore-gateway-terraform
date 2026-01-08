@@ -21,7 +21,7 @@ resource "aws_bedrockagentcore_gateway" "this" {
     content {
       custom_jwt_authorizer {
         discovery_url    = authorizer_configuration.value.discovery_url
-        allowed_audience = authorizer_configuration.value.allowed_audience
+        allowed_audience = length(authorizer_configuration.value.allowed_audience) > 0 ? authorizer_configuration.value.allowed_audience : null
         allowed_clients  = authorizer_configuration.value.allowed_clients
       }
     }
