@@ -29,6 +29,14 @@ locals {
         search_type        = "SEMANTIC"
         supported_versions = ["2025-03-26"]
       }, config.protocol_config) : null
+      
+      # Limpiar jwt_config para omitir listas vacías (compatibilidad con provider v6.36.0)
+      # El provider no acepta listas vacías, deben ser null para ser omitidas
+      jwt_config = config.jwt_config != null ? {
+        discovery_url    = config.jwt_config.discovery_url
+        allowed_audience = try(length(config.jwt_config.allowed_audience), 0) > 0 ? config.jwt_config.allowed_audience : null
+        allowed_clients  = try(length(config.jwt_config.allowed_clients), 0) > 0 ? config.jwt_config.allowed_clients : null
+      } : null
     })
   }
   
