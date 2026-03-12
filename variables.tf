@@ -45,6 +45,7 @@ variable "gateways" {
       discovery_url    = string
       allowed_audience = optional(list(string), [])
       allowed_clients  = optional(list(string), [])
+      allowed_scopes   = optional(list(string), [])
     }))
     
     # Configuración del protocolo MCP

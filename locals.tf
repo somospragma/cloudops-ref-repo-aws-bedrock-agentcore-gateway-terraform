@@ -36,6 +36,7 @@ locals {
         discovery_url    = config.jwt_config.discovery_url
         allowed_audience = try(length(config.jwt_config.allowed_audience), 0) > 0 ? config.jwt_config.allowed_audience : null
         allowed_clients  = try(length(config.jwt_config.allowed_clients), 0) > 0 ? config.jwt_config.allowed_clients : null
+        allowed_scopes   = try(length(config.jwt_config.allowed_scopes), 0) > 0 ? config.jwt_config.allowed_scopes : null
       } : null
     })
   }

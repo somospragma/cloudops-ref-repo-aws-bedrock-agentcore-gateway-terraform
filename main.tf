@@ -20,11 +20,13 @@ resource "aws_bedrockagentcore_gateway" "this" {
     
     content {
       custom_jwt_authorizer {
-        discovery_url    = authorizer_configuration.value.discovery_url
-        # Usar try() para omitir atributos null (compatibilidad con provider v6.36.0)
-        # El provider no acepta listas vacías ni null explícitos, solo omisión completa
-        allowed_audience = try(authorizer_configuration.value.allowed_audience, null)
-        allowed_clients  = try(authorizer_configuration.value.allowed_clients, null)
+        discovery_url = authorizer_configuration.value.discovery_url
+        
+        # Solo incluir allowed_audience si tiene valores (compatibilidad con provider v6.36.0)
+        allowed_audience = authorizer_configuration.value.allowed_audience != null ? authorizer_configuration.value.allowed_audience : []
+        
+        # Solo incluir allowed_clients si tiene valores (compatibilidad con provider v6.36.0)
+        allowed_clients = authorizer_configuration.value.allowed_clients != null ? authorizer_configuration.value.allowed_clients : []
       }
     }
   }
