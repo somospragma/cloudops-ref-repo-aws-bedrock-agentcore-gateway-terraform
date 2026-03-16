@@ -6,7 +6,7 @@ locals {
   
   # Construcción de nombres para gateways (PC-IAC-003)
   gateway_names = {
-    for key, config in var.gateways : key => "${local.governance_prefix}-agentcore-gateway-${key}"
+    for key, config in var.gateways : key => "${local.governance_prefix}-agentcore-${key}"
   }
   
   # Etiquetas base del módulo (PC-IAC-004)
