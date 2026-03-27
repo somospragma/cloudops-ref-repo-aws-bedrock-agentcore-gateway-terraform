@@ -76,9 +76,9 @@ resource "aws_bedrockagentcore_gateway" "this" {
   )
   
   # Ciclo de vida para proteger recursos críticos (PC-IAC-010)
-  lifecycle {
-    prevent_destroy = true # Protección contra eliminación accidental
-  }
+  # lifecycle {
+  #   prevent_destroy = true # Protección contra eliminación accidental
+  # }
 }
 
 # Gateway Targets (PC-IAC-010, PC-IAC-014, PC-IAC-023)
