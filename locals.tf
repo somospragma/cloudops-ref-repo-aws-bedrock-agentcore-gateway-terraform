@@ -39,7 +39,7 @@ locals {
         gateway_key    = gateway_key
         target_key     = target_key
         gateway_id     = aws_bedrockagentcore_gateway.this[gateway_key].gateway_id
-        target_name    = "${local.governance_prefix}-target-${gateway_key}-${target_key}"
+        target_name    = "${local.governance_prefix}-${gateway_key}-${target_key}"
         config         = target_config
       }
     ]
