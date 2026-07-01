@@ -25,19 +25,19 @@ resource "aws_bedrockagentcore_gateway" "this" {
         allowed_clients  = length(authorizer_configuration.value.allowed_clients) > 0 ? authorizer_configuration.value.allowed_clients : null
         allowed_scopes   = length(authorizer_configuration.value.allowed_scopes) > 0 ? authorizer_configuration.value.allowed_scopes : null
 
-        dynamic "custom_claims" {
+        dynamic "custom_claim" {
           for_each = authorizer_configuration.value.custom_claims
 
           content {
-            inbound_token_claim_name       = custom_claims.value.inbound_token_claim_name
-            inbound_token_claim_value_type = custom_claims.value.inbound_token_claim_value_type
+            inbound_token_claim_name       = custom_claim.value.inbound_token_claim_name
+            inbound_token_claim_value_type = custom_claim.value.inbound_token_claim_value_type
 
             authorizing_claim_match_value {
-              claim_match_operator = custom_claims.value.authorizing_claim_match_value.claim_match_operator
+              claim_match_operator = custom_claim.value.authorizing_claim_match_value.claim_match_operator
 
               claim_match_value {
-                match_value_string      = custom_claims.value.authorizing_claim_match_value.match_value_string
-                match_value_string_list = custom_claims.value.authorizing_claim_match_value.match_value_string_list
+                match_value_string      = custom_claim.value.authorizing_claim_match_value.match_value_string
+                match_value_string_list = custom_claim.value.authorizing_claim_match_value.match_value_string_list
               }
             }
           }
