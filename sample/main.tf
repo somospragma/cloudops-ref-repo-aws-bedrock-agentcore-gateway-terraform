@@ -28,6 +28,27 @@ module "bedrock_agentcore_gateway" {
         discovery_url    = var.jwt_discovery_url
         allowed_audience = var.jwt_allowed_audience
         allowed_clients  = var.jwt_allowed_clients
+        allowed_scopes   = ["read", "write", "admin"]
+        custom_claims = [
+          {
+            inbound_token_claim_name       = "department"
+            inbound_token_claim_value_type = "STRING"
+            authorizing_claim_match_value = {
+              claim_match_operator    = "EQUALS"
+              match_value_string      = "engineering"
+              match_value_string_list = null
+            }
+          },
+          {
+            inbound_token_claim_name       = "roles"
+            inbound_token_claim_value_type = "STRING_ARRAY"
+            authorizing_claim_match_value = {
+              claim_match_operator    = "CONTAINS_ANY"
+              match_value_string      = null
+              match_value_string_list = ["admin", "developer"]
+            }
+          }
+        ]
       }
       
       # Configuración del protocolo MCP

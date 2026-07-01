@@ -60,7 +60,7 @@ output "target_ids_by_key" {
 output "workload_identity_arns" {
   description = "ARNs de las identidades de workload de los gateways"
   value = {
-    for key, gateway in aws_bedrockagentcore_gateway.this : 
+    for key, gateway in aws_bedrockagentcore_gateway.this :
     key => gateway.workload_identity_details[0].workload_identity_arn
   }
 }

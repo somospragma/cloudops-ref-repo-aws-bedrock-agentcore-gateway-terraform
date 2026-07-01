@@ -108,6 +108,18 @@ module "bedrock_agentcore_gateway" {
         discovery_url    = "https://auth.empresa.com/.well-known/openid-configuration"
         allowed_audience = ["ai-agents", "web-client"]
         allowed_clients  = ["client-123", "client-456"]
+        allowed_scopes   = ["read", "write"]
+        custom_claims = [
+          {
+            inbound_token_claim_name       = "department"
+            inbound_token_claim_value_type = "STRING"
+            authorizing_claim_match_value = {
+              claim_match_operator    = "EQUALS"
+              match_value_string      = "engineering"
+              match_value_string_list = null
+            }
+          }
+        ]
       }
 
       protocol_config = {
@@ -182,6 +194,16 @@ gateways = {
       discovery_url    = string           # URL de descubrimiento OIDC
       allowed_audience = list(string)     # Audiencias permitidas
       allowed_clients  = list(string)     # Clientes permitidos
+      allowed_scopes   = list(string)     # Scopes permitidos
+      custom_claims    = list(object({    # Claims personalizados
+        inbound_token_claim_name       = string  # Nombre del claim
+        inbound_token_claim_value_type = string  # "STRING" o "STRING_ARRAY"
+        authorizing_claim_match_value = object({
+          claim_match_operator    = string         # "EQUALS", "CONTAINS", "CONTAINS_ANY"
+          match_value_string      = string         # Valor string (EQUALS/CONTAINS)
+          match_value_string_list = list(string)   # Lista de valores (CONTAINS_ANY)
+        })
+      }))
     }))
     
     # Configuración del protocolo MCP
@@ -211,6 +233,7 @@ gateways = {
       # Proveedor de credenciales
       credential_provider = object({
         type = string  # "gateway_iam_role", "api_key", "oauth"
+        # Para OAuth: grant_type (CLIENT_CREDENTIALS, AUTHORIZATION_CODE, TOKEN_EXCHANGE)
         # Configuraciones específicas por tipo...
       })
       
@@ -269,6 +292,18 @@ module "ai_gateway" {
         discovery_url    = "https://auth.acme.com/.well-known/openid-configuration"
         allowed_audience = ["chatbot-api"]
         allowed_clients  = ["web-app", "mobile-app"]
+        allowed_scopes   = ["chatbot:read", "chatbot:write"]
+        custom_claims = [
+          {
+            inbound_token_claim_name       = "tenant_id"
+            inbound_token_claim_value_type = "STRING"
+            authorizing_claim_match_value = {
+              claim_match_operator    = "EQUALS"
+              match_value_string      = "acme-corp"
+              match_value_string_list = null
+            }
+          }
+        ]
       }
       
       targets = {
@@ -398,6 +433,7 @@ module "multi_target_gateway" {
             oauth_config = {
               provider_arn = data.aws_secretsmanager_secret.oauth.arn
               scopes       = ["read", "write"]
+              grant_type   = "CLIENT_CREDENTIALS"
             }
           }
         }
@@ -432,6 +468,27 @@ module "complex_schema_gateway" {
         discovery_url    = "https://auth.fintech.com/.well-known/openid-configuration"
         allowed_audience = ["trading-api"]
         allowed_clients  = ["trading-app"]
+        allowed_scopes   = ["trading:execute", "trading:read"]
+        custom_claims = [
+          {
+            inbound_token_claim_name       = "risk_level"
+            inbound_token_claim_value_type = "STRING"
+            authorizing_claim_match_value = {
+              claim_match_operator    = "EQUALS"
+              match_value_string      = "approved"
+              match_value_string_list = null
+            }
+          },
+          {
+            inbound_token_claim_name       = "trading_permissions"
+            inbound_token_claim_value_type = "STRING_ARRAY"
+            authorizing_claim_match_value = {
+              claim_match_operator    = "CONTAINS_ANY"
+              match_value_string      = null
+              match_value_string_list = ["execute_orders", "view_portfolio"]
+            }
+          }
+        ]
       }
       
       targets = {

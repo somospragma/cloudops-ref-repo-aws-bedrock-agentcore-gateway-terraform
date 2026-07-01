@@ -45,6 +45,16 @@ variable "gateways" {
       discovery_url    = string
       allowed_audience = optional(list(string), [])
       allowed_clients  = optional(list(string), [])
+      allowed_scopes   = optional(list(string), [])
+      custom_claims = optional(list(object({
+        inbound_token_claim_name       = string
+        inbound_token_claim_value_type = string # "STRING" o "STRING_ARRAY"
+        authorizing_claim_match_value = object({
+          claim_match_operator    = string                 # "EQUALS", "CONTAINS", "CONTAINS_ANY"
+          match_value_string      = optional(string)       # Para STRING+EQUALS o STRING_ARRAY+CONTAINS
+          match_value_string_list = optional(list(string)) # Para STRING_ARRAY+CONTAINS_ANY
+        })
+      })), [])
     }))
 
     # Configuración del protocolo MCP
@@ -94,9 +104,11 @@ variable "gateways" {
 
         # Para OAuth
         oauth_config = optional(object({
-          provider_arn      = string
-          scopes            = optional(list(string), [])
-          custom_parameters = optional(map(string), {})
+          provider_arn       = string
+          scopes             = optional(list(string), [])
+          grant_type         = optional(string, "CLIENT_CREDENTIALS") # CLIENT_CREDENTIALS, AUTHORIZATION_CODE, TOKEN_EXCHANGE
+          custom_parameters  = optional(map(string), {})
+          default_return_url = optional(string) # Requerido para AUTHORIZATION_CODE
         }))
       })
 
@@ -181,6 +193,40 @@ variable "gateways" {
       for k, v in var.gateways : contains(["MCP"], v.protocol_type)
     ])
     error_message = "El tipo de protocolo debe ser 'MCP'."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.gateways :
+      v.jwt_config == null || alltrue([
+        for claim in coalesce(v.jwt_config.custom_claims, []) :
+        contains(["STRING", "STRING_ARRAY"], claim.inbound_token_claim_value_type)
+      ])
+    ])
+    error_message = "inbound_token_claim_value_type debe ser 'STRING' o 'STRING_ARRAY'."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.gateways :
+      v.jwt_config == null || alltrue([
+        for claim in coalesce(v.jwt_config.custom_claims, []) :
+        contains(["EQUALS", "CONTAINS", "CONTAINS_ANY"], claim.authorizing_claim_match_value.claim_match_operator)
+      ])
+    ])
+    error_message = "claim_match_operator debe ser 'EQUALS', 'CONTAINS' o 'CONTAINS_ANY'."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.gateways : alltrue([
+        for tk, tv in coalesce(v.targets, {}) :
+        tv.credential_provider.type != "oauth" ||
+        tv.credential_provider.oauth_config == null ||
+        contains(["CLIENT_CREDENTIALS", "AUTHORIZATION_CODE", "TOKEN_EXCHANGE"], coalesce(tv.credential_provider.oauth_config.grant_type, "CLIENT_CREDENTIALS"))
+      ])
+    ])
+    error_message = "grant_type debe ser 'CLIENT_CREDENTIALS', 'AUTHORIZATION_CODE' o 'TOKEN_EXCHANGE'."
   }
 }
 
