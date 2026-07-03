@@ -22,7 +22,26 @@ resource "aws_bedrockagentcore_gateway" "this" {
       custom_jwt_authorizer {
         discovery_url    = authorizer_configuration.value.discovery_url
         allowed_audience = length(authorizer_configuration.value.allowed_audience) > 0 ? authorizer_configuration.value.allowed_audience : null
-        allowed_clients  = authorizer_configuration.value.allowed_clients
+        allowed_clients  = length(authorizer_configuration.value.allowed_clients) > 0 ? authorizer_configuration.value.allowed_clients : null
+        allowed_scopes   = length(authorizer_configuration.value.allowed_scopes) > 0 ? authorizer_configuration.value.allowed_scopes : null
+
+        dynamic "custom_claim" {
+          for_each = authorizer_configuration.value.custom_claims
+
+          content {
+            inbound_token_claim_name       = custom_claim.value.inbound_token_claim_name
+            inbound_token_claim_value_type = custom_claim.value.inbound_token_claim_value_type
+
+            authorizing_claim_match_value {
+              claim_match_operator = custom_claim.value.authorizing_claim_match_value.claim_match_operator
+
+              claim_match_value {
+                match_value_string      = custom_claim.value.authorizing_claim_match_value.match_value_string
+                match_value_string_list = custom_claim.value.authorizing_claim_match_value.match_value_string_list
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -120,9 +139,11 @@ resource "aws_bedrockagentcore_gateway_target" "this" {
         for_each = credential_provider_configuration.value.type == "oauth" && credential_provider_configuration.value.oauth_config != null ? [credential_provider_configuration.value.oauth_config] : []
 
         content {
-          provider_arn      = oauth.value.provider_arn
-          scopes            = oauth.value.scopes
-          custom_parameters = oauth.value.custom_parameters
+          provider_arn       = oauth.value.provider_arn
+          scopes             = oauth.value.scopes
+          grant_type         = oauth.value.grant_type
+          custom_parameters  = length(oauth.value.custom_parameters) > 0 ? oauth.value.custom_parameters : null
+          default_return_url = oauth.value.default_return_url
         }
       }
     }
