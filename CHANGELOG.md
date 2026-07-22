@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Match values: `match_value_string` for single values, `match_value_string_list` for arrays
 - Support for `grant_type` in OAuth credential provider configuration (`CLIENT_CREDENTIALS`, `AUTHORIZATION_CODE`, `TOKEN_EXCHANGE`)
 - Support for `default_return_url` in OAuth credential provider (required for `AUTHORIZATION_CODE` grant type)
+- Support for `listing_mode` in MCP server targets (`DEFAULT` or `DYNAMIC`). DEFAULT caches capabilities for semantic search; DYNAMIC forwards list calls live to the MCP server for per-user tool discovery
+- Validation: `listing_mode = "DYNAMIC"` is incompatible with `search_type = "SEMANTIC"` at the gateway level
 
 ### Fixed
 - Fix "Provider produced inconsistent result after apply" error on `credential_provider_configuration.oauth.grant_type` when using AWS provider >= 6.48.0. The field is now explicitly set (defaults to `CLIENT_CREDENTIALS`) to prevent drift between plan and apply.

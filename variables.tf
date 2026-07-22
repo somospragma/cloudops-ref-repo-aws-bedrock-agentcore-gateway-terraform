@@ -81,6 +81,7 @@ variable "gateways" {
 
       # Para targets MCP Server
       mcp_endpoint = optional(string)
+      listing_mode = optional(string, "DEFAULT") # "DEFAULT" o "DYNAMIC" - Modo de listado para targets MCP Server
 
       # Para targets OpenAPI/Smithy
       schema_config = optional(object({
@@ -227,6 +228,27 @@ variable "gateways" {
       ])
     ])
     error_message = "grant_type debe ser 'CLIENT_CREDENTIALS', 'AUTHORIZATION_CODE' o 'TOKEN_EXCHANGE'."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.gateways : alltrue([
+        for tk, tv in coalesce(v.targets, {}) :
+        tv.type != "mcp_server" || contains(["DEFAULT", "DYNAMIC"], coalesce(tv.listing_mode, "DEFAULT"))
+      ])
+    ])
+    error_message = "listing_mode debe ser 'DEFAULT' o 'DYNAMIC' para targets de tipo mcp_server."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.gateways :
+      coalesce(try(v.protocol_config.search_type, "SEMANTIC"), "SEMANTIC") != "SEMANTIC" || !anytrue([
+        for tk, tv in coalesce(v.targets, {}) :
+        tv.type == "mcp_server" && coalesce(tv.listing_mode, "DEFAULT") == "DYNAMIC"
+      ])
+    ])
+    error_message = "Los targets con listing_mode 'DYNAMIC' no son compatibles con search_type 'SEMANTIC'. Cambie search_type del gateway o use listing_mode 'DEFAULT' en los targets MCP server."
   }
 }
 
