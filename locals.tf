@@ -26,7 +26,6 @@ locals {
 
       # Configuración del protocolo con valores por defecto
       protocol_config = config.protocol_config != null ? merge({
-        search_type        = "SEMANTIC"
         supported_versions = ["2025-03-26"]
       }, config.protocol_config) : null
     })

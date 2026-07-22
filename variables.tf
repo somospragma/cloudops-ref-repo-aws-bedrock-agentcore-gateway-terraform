@@ -60,7 +60,7 @@ variable "gateways" {
     # Configuración del protocolo MCP
     protocol_config = optional(object({
       instructions       = optional(string)
-      search_type        = optional(string, "SEMANTIC")
+      search_type        = optional(string) # "SEMANTIC" o null. Omitir para gateways con targets DYNAMIC.
       supported_versions = optional(list(string), ["2025-03-26"])
     }))
 
@@ -243,12 +243,12 @@ variable "gateways" {
   validation {
     condition = alltrue([
       for k, v in var.gateways :
-      coalesce(try(v.protocol_config.search_type, "SEMANTIC"), "SEMANTIC") != "SEMANTIC" || !anytrue([
+      try(v.protocol_config.search_type, null) == null || !anytrue([
         for tk, tv in coalesce(v.targets, {}) :
         tv.type == "mcp_server" && coalesce(tv.listing_mode, "DEFAULT") == "DYNAMIC"
       ])
     ])
-    error_message = "Los targets con listing_mode 'DYNAMIC' no son compatibles con search_type 'SEMANTIC'. Cambie search_type del gateway o use listing_mode 'DEFAULT' en los targets MCP server."
+    error_message = "Los targets con listing_mode 'DYNAMIC' no son compatibles con search_type 'SEMANTIC'. Omita search_type del protocol_config del gateway o use listing_mode 'DEFAULT' en los targets MCP server."
   }
 }
 

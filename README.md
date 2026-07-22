@@ -586,7 +586,7 @@ module "complex_schema_gateway" {
 
 Este ejemplo muestra un gateway con `listing_mode = "DYNAMIC"` para descubrimiento de herramientas en tiempo real. Útil cuando el MCP server personaliza herramientas por usuario (por ejemplo, basado en roles o permisos).
 
-> **Nota**: `listing_mode = "DYNAMIC"` NO es compatible con `search_type = "SEMANTIC"`. El gateway debe usar un `search_type` diferente (por ejemplo, `"NONE"`).
+> **Nota**: `listing_mode = "DYNAMIC"` NO es compatible con `search_type = "SEMANTIC"`. El gateway debe omitir `search_type` en su `protocol_config` (o establecer `protocol_config = null`).
 
 ```hcl
 module "dynamic_gateway" {
@@ -612,10 +612,9 @@ module "dynamic_gateway" {
         allowed_scopes   = ["tools:read", "tools:execute"]
       }
       
-      # IMPORTANTE: search_type NO puede ser "SEMANTIC" con targets DYNAMIC
+      # IMPORTANTE: search_type debe omitirse con targets DYNAMIC
       protocol_config = {
         instructions       = "Gateway multi-tenant con listado dinámico"
-        search_type        = "NONE"
         supported_versions = ["2025-03-26", "2025-06-18"]
       }
       
@@ -699,7 +698,7 @@ module "dynamic_gateway" {
 - **Gateway**: JWT con claims de tenant para aislamiento
 - **Targets**: MCP servers con `listing_mode = "DYNAMIC"` para herramientas personalizadas por tenant
 - **Listado Dinámico**: El MCP server filtra herramientas según la identidad del usuario
-- **search_type**: `"NONE"` (requerido para compatibilidad con DYNAMIC)
+- **search_type**: Omitido (requerido para compatibilidad con DYNAMIC)
 - **Caso de uso**: Aplicaciones SaaS donde cada tenant ve solo sus herramientas autorizadas
 
 ## Seguridad y Cumplimiento

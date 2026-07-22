@@ -157,10 +157,9 @@ module "bedrock_agentcore_gateway" {
       jwt_config = null
 
       # Configuración básica del protocolo
-      # search_type "NONE" permite usar targets con listing_mode "DYNAMIC"
+      # Omitir search_type permite usar targets con listing_mode "DYNAMIC"
       protocol_config = {
         instructions       = "Gateway secundario para pruebas con listado dinámico"
-        search_type        = "NONE"
         supported_versions = ["2025-03-26"]
       }
 
