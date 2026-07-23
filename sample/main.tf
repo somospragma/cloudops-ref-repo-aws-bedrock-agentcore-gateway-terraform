@@ -2,27 +2,27 @@
 
 module "bedrock_agentcore_gateway" {
   source = "../" # Referencia al módulo padre
-  
+
   # Inyección del provider (PC-IAC-005)
   providers = {
     aws.project = aws.principal
   }
-  
+
   # Variables de Gobernanza (PC-IAC-003)
   client      = var.client
   project     = var.project
   environment = var.environment
-  
+
   # Configuración de Gateways
   gateways = {
     # Gateway principal con autorización JWT
     main = {
-      description     = "Gateway principal para agentes AI con autorización JWT"
-      authorizer_type = "CUSTOM_JWT"
-      protocol_type   = "MCP"
-      exception_level = "ERROR"
+      description       = "Gateway principal para agentes AI con autorización JWT"
+      authorizer_type   = "CUSTOM_JWT"
+      protocol_type     = "MCP"
+      exception_level   = "DEBUG"
       enable_encryption = true
-      
+
       # Configuración JWT
       jwt_config = {
         discovery_url    = var.jwt_discovery_url
@@ -50,14 +50,14 @@ module "bedrock_agentcore_gateway" {
           }
         ]
       }
-      
+
       # Configuración del protocolo MCP
       protocol_config = {
         instructions       = "Gateway para manejo de solicitudes MCP de agentes AI"
         search_type        = "SEMANTIC"
         supported_versions = ["2025-03-26", "2025-06-18"]
       }
-      
+
       # Targets del gateway
       targets = {
         # Target Lambda para procesamiento
@@ -65,17 +65,17 @@ module "bedrock_agentcore_gateway" {
           type        = "lambda"
           description = "Procesador de solicitudes Lambda"
           lambda_arn  = data.aws_lambda_function.processor.arn
-          
+
           # Configuración del proveedor de credenciales
           credential_provider = {
             type = "gateway_iam_role"
           }
-          
+
           # Esquema de herramienta
           tool_schema = {
             name        = "process_request"
             description = "Procesa solicitudes entrantes de agentes AI"
-            
+
             # Esquema de entrada
             input_schema = {
               type        = "object"
@@ -107,7 +107,7 @@ module "bedrock_agentcore_gateway" {
                 }
               ]
             }
-            
+
             # Esquema de salida
             output_schema = {
               type        = "object"
@@ -134,45 +134,56 @@ module "bedrock_agentcore_gateway" {
               ]
             }
           }
-          
+
           additional_tags = {
             TargetType = "Lambda"
             Function   = "RequestProcessor"
           }
         }
       }
-      
+
       additional_tags = var.additional_tags
     }
-    
+
     # Gateway secundario con autorización IAM (ejemplo adicional)
     secondary = {
-      description     = "Gateway secundario con autorización IAM"
-      authorizer_type = "AWS_IAM"
-      protocol_type   = "MCP"
-      exception_level = "WARN"
+      description       = "Gateway secundario con autorización IAM"
+      authorizer_type   = "AWS_IAM"
+      protocol_type     = "MCP"
       enable_encryption = false
-      
+
       # Sin configuración JWT para autorización IAM
       jwt_config = null
-      
+
       # Configuración básica del protocolo
+      # Omitir search_type permite usar targets con listing_mode "DYNAMIC"
       protocol_config = {
-        instructions       = "Gateway secundario para pruebas"
-        search_type        = "SEMANTIC"
+        instructions       = "Gateway secundario para pruebas con listado dinámico"
         supported_versions = ["2025-03-26"]
       }
-      
-      # Targets vacíos para este ejemplo
-      targets = {}
-      
+
+      # Targets con diferentes modos de listado
+      targets = {
+        # Target MCP Server con listado dinámico (descubrimiento en tiempo real)
+        dynamic_mcp = {
+          type         = "mcp_server"
+          description  = "MCP server con listado dinámico - herramientas personalizadas por usuario"
+          mcp_endpoint = "https://mcp.internal.example.com/mcp"
+          listing_mode = "DYNAMIC"
+
+          credential_provider = {
+            type = "gateway_iam_role"
+          }
+        }
+      }
+
       additional_tags = {
         Purpose = "Testing"
         Type    = "Secondary"
       }
     }
   }
-  
+
   # Dependencias externas (PC-IAC-023)
   gateway_role_arn = data.aws_iam_role.gateway_role.arn
   kms_key_arn      = var.kms_key_id != null ? data.aws_kms_key.gateway_key[0].arn : null

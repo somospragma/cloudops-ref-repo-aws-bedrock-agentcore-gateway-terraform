@@ -261,7 +261,8 @@ resource "aws_bedrockagentcore_gateway_target" "this" {
         for_each = each.value.config.type == "mcp_server" ? [each.value.config] : []
 
         content {
-          endpoint = mcp_server.value.mcp_endpoint
+          endpoint     = mcp_server.value.mcp_endpoint
+          listing_mode = mcp_server.value.listing_mode
         }
       }
 

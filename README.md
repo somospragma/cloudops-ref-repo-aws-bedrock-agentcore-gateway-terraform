@@ -36,6 +36,7 @@ La arquitectura del módulo se organiza en las siguientes capas:
 ### Capacidades Avanzadas
 - **Interceptores**: Ejecución de código personalizado durante cada invocación (REQUEST/RESPONSE)
 - **Búsqueda Semántica**: Búsqueda inteligente de herramientas usando consultas en lenguaje natural
+- **Modo de Listado (Listing Mode)**: Control sobre cómo los clientes descubren las capacidades de MCP servers (`DEFAULT` para caché con búsqueda semántica, `DYNAMIC` para descubrimiento en tiempo real por usuario)
 - **Esquemas Complejos**: Soporte para esquemas inline y almacenados en S3 con serialización JSON
 - **Workload Identity**: Exposición automática de identidades de workload para integración
 
@@ -101,7 +102,7 @@ module "bedrock_agentcore_gateway" {
       description       = "Gateway principal para agentes AI"
       authorizer_type   = "CUSTOM_JWT"
       protocol_type     = "MCP"
-      exception_level   = "ERROR"
+      exception_level   = "DEBUG"
       enable_encryption = true
       
       jwt_config = {
@@ -186,7 +187,7 @@ gateways = {
     description       = string                    # Descripción del gateway
     authorizer_type   = string                    # "CUSTOM_JWT" o "AWS_IAM"
     protocol_type     = optional(string, "MCP")  # Tipo de protocolo
-    exception_level   = optional(string, "ERROR") # Nivel de excepciones
+    exception_level   = optional(string)         # "DEBUG" o null (omitido = mensajes sanitizados)
     enable_encryption = optional(bool, true)     # Habilitar cifrado
     
     # Configuración JWT (requerida para CUSTOM_JWT)
@@ -226,9 +227,10 @@ gateways = {
       description = string  # Descripción del target
       
       # Configuración específica por tipo
-      lambda_arn     = optional(string)  # Para targets Lambda
-      mcp_endpoint   = optional(string)  # Para MCP servers
-      schema_config  = optional(object)  # Para OpenAPI/Smithy
+      lambda_arn     = optional(string)              # Para targets Lambda
+      mcp_endpoint   = optional(string)              # Para MCP servers
+      listing_mode   = optional(string, "DEFAULT")   # "DEFAULT" o "DYNAMIC" (solo MCP servers)
+      schema_config  = optional(object)              # Para OpenAPI/Smithy
       
       # Proveedor de credenciales
       credential_provider = object({
@@ -406,6 +408,7 @@ module "multi_target_gateway" {
           type         = "mcp_server"
           description  = "Base de conocimiento empresarial"
           mcp_endpoint = "https://kb.corp.com/mcp"
+          listing_mode = "DEFAULT"  # Capacidades cacheadas, compatible con búsqueda semántica
           
           credential_provider = {
             type = "api_key"
@@ -579,6 +582,86 @@ module "complex_schema_gateway" {
 }
 ```
 
+### Ejemplo 4: Gateway con Listado Dinámico (MCP Server)
+
+Este ejemplo muestra un gateway con `listing_mode = "DYNAMIC"` para descubrimiento de herramientas en tiempo real. Útil cuando el MCP server personaliza herramientas por usuario (por ejemplo, basado en roles o permisos).
+
+> **Nota**: `listing_mode = "DYNAMIC"` NO es compatible con `search_type = "SEMANTIC"`. El gateway debe omitir `search_type` en su `protocol_config` (o establecer `protocol_config = null`).
+
+```hcl
+module "dynamic_gateway" {
+  source = "../"
+  
+  providers = {
+    aws.project = aws.principal
+  }
+  
+  client      = "corp"
+  project     = "multi-tenant"
+  environment = "pdn"
+  
+  gateways = {
+    dynamic_platform = {
+      description     = "Gateway con descubrimiento dinámico de herramientas"
+      authorizer_type = "CUSTOM_JWT"
+      
+      jwt_config = {
+        discovery_url    = "https://auth.corp.com/.well-known/openid-configuration"
+        allowed_audience = ["platform-api"]
+        allowed_clients  = ["tenant-app"]
+        allowed_scopes   = ["tools:read", "tools:execute"]
+      }
+      
+      # IMPORTANTE: search_type debe omitirse con targets DYNAMIC
+      protocol_config = {
+        instructions       = "Gateway multi-tenant con listado dinámico"
+        supported_versions = ["2025-03-26", "2025-06-18"]
+      }
+      
+      targets = {
+        # MCP Server con listado dinámico - herramientas personalizadas por usuario
+        tenant_tools = {
+          type         = "mcp_server"
+          description  = "Servidor MCP multi-tenant con FGAC"
+          mcp_endpoint = "https://tools.corp.com/mcp"
+          listing_mode = "DYNAMIC"  # List calls se envían al MCP server en tiempo real
+          
+          credential_provider = {
+            type = "gateway_iam_role"
+          }
+        }
+        
+        # MCP Server con listado por defecto (caché) en el mismo gateway
+        shared_tools = {
+          type         = "mcp_server"
+          description  = "Herramientas compartidas cacheadas"
+          mcp_endpoint = "https://shared-tools.corp.com/mcp"
+          listing_mode = "DEFAULT"  # Capacidades cacheadas, sincronización vía API
+          
+          credential_provider = {
+            type = "gateway_iam_role"
+          }
+        }
+      }
+    }
+  }
+  
+  gateway_role_arn = data.aws_iam_role.gateway.arn
+  kms_key_arn      = data.aws_kms_key.encryption.arn
+}
+```
+
+**Comportamiento por modo de listado:**
+
+| Aspecto | `DEFAULT` | `DYNAMIC` |
+|---------|-----------|-----------|
+| Descubrimiento | Caché en control plane | En tiempo real al MCP server |
+| Búsqueda semántica | ✅ Compatible | ❌ No compatible |
+| OAuth 3-legged | ✅ Compatible | ❌ No compatible |
+| Personalización por usuario | ❌ Mismas herramientas para todos | ✅ Herramientas filtradas por identidad |
+| Rendimiento de listado | Rápido (desde caché) | Depende de latencia del MCP server |
+| Sincronización | Automática en create/update + `SynchronizeGatewayTargets` API | No aplica |
+
 ## Escenarios de Uso Comunes
 
 ### 1. Chatbot Empresarial con IA
@@ -610,6 +693,13 @@ module "complex_schema_gateway" {
 - **Targets**: Lambda para generación de código, APIs de repositorios, servicios de CI/CD
 - **Interceptores**: Análisis de seguridad y calidad de código
 - **Esquemas**: Definiciones para diferentes lenguajes y frameworks
+
+### 6. Plataforma Multi-Tenant con Control de Acceso por Usuario
+- **Gateway**: JWT con claims de tenant para aislamiento
+- **Targets**: MCP servers con `listing_mode = "DYNAMIC"` para herramientas personalizadas por tenant
+- **Listado Dinámico**: El MCP server filtra herramientas según la identidad del usuario
+- **search_type**: Omitido (requerido para compatibilidad con DYNAMIC)
+- **Caso de uso**: Aplicaciones SaaS donde cada tenant ve solo sus herramientas autorizadas
 
 ## Seguridad y Cumplimiento
 
@@ -671,6 +761,103 @@ module "complex_schema_gateway" {
 4. **Validar Esquemas**: Asegurar que no se expongan datos sensibles
 5. **Monitorear Accesos**: Usar CloudTrail y CloudWatch para auditoría
 
+## Guía de Migración
+
+### Migrar de `listing_mode = "DYNAMIC"` a `"DEFAULT"` con Búsqueda Semántica
+
+La API de AWS **no permite** habilitar `search_type = "SEMANTIC"` en un gateway que ya tiene targets asociados. Esta es una restricción del servicio que aplica independientemente del `listing_mode` actual de los targets.
+
+Si necesita migrar un gateway existente (sin búsqueda semántica) a uno con `search_type = "SEMANTIC"`, debe seguir un proceso de **3 pasos con terraform apply separados**:
+
+#### Opción A: Migración sin Downtime del Gateway (3 applies)
+
+**Paso 1** — Eliminar todos los targets del gateway:
+
+```hcl
+gateways = {
+  my_gateway = {
+    # ... configuración del gateway sin cambios
+    protocol_config = {
+      instructions       = "..."
+      # search_type aún omitido
+      supported_versions = ["2025-03-26"]
+    }
+    targets = {}  # <-- Vaciar targets
+  }
+}
+```
+
+```bash
+terraform apply
+```
+
+**Paso 2** — Habilitar búsqueda semántica (gateway sin targets):
+
+```hcl
+gateways = {
+  my_gateway = {
+    # ... configuración del gateway
+    protocol_config = {
+      instructions       = "..."
+      search_type        = "SEMANTIC"  # <-- Ahora sí es posible
+      supported_versions = ["2025-03-26"]
+    }
+    targets = {}  # Aún vacío
+  }
+}
+```
+
+```bash
+terraform apply
+```
+
+**Paso 3** — Re-agregar los targets con `listing_mode = "DEFAULT"`:
+
+```hcl
+gateways = {
+  my_gateway = {
+    # ... configuración del gateway con SEMANTIC
+    protocol_config = {
+      instructions       = "..."
+      search_type        = "SEMANTIC"
+      supported_versions = ["2025-03-26"]
+    }
+    targets = {
+      mcp_server = {
+        type         = "mcp_server"
+        listing_mode = "DEFAULT"  # Compatible con SEMANTIC
+        mcp_endpoint = "https://..."
+        credential_provider = { type = "gateway_iam_role" }
+      }
+    }
+  }
+}
+```
+
+```bash
+terraform apply
+```
+
+#### Opción B: Recreación del Gateway (1 apply, con downtime)
+
+Si el downtime es aceptable, puede forzar la recreación del gateway. Esto lo crea desde cero con SEMANTIC habilitado:
+
+```bash
+terraform apply -replace='module.agentcore_gateway[0].aws_bedrockagentcore_gateway.this["my_key"]'
+```
+
+> ⚠️ **Advertencia**: Esto cambia el `gateway_id` y la `gateway_url`. Todos los clientes que apuntan al gateway deben actualizarse.
+
+#### Restricciones de la API de AWS
+
+| Operación | ¿Permitida? | Notas |
+|-----------|:-----------:|-------|
+| Crear gateway con `search_type = "SEMANTIC"` | ✅ | Debe hacerse al crear el gateway |
+| Agregar targets a gateway con SEMANTIC | ✅ | Los targets se indexan automáticamente |
+| Actualizar gateway a SEMANTIC **sin** targets | ✅ | Gateway debe tener 0 targets |
+| Actualizar gateway a SEMANTIC **con** targets | ❌ | `ValidationException` |
+| Target DYNAMIC en gateway con SEMANTIC | ❌ | DYNAMIC no es compatible con búsqueda semántica |
+
 ## Observaciones
 
 ### Decisiones de Diseño Clave
@@ -695,6 +882,7 @@ module "complex_schema_gateway" {
 
 #### 4. Flexibilidad de Configuración
 - **Múltiples Tipos de Target**: Soporte completo para Lambda, MCP, OpenAPI, Smithy
+- **Modos de Listado**: `DEFAULT` (caché + búsqueda semántica) y `DYNAMIC` (descubrimiento en tiempo real por usuario) para MCP servers
 - **Esquemas Complejos**: Serialización JSON para estructuras anidadas
 - **Autorización Dual**: JWT personalizado y AWS IAM en el mismo módulo
 - **Configuración Condicional**: Bloques dinámicos para diferentes escenarios
@@ -716,6 +904,7 @@ module "complex_schema_gateway" {
 #### 3. Consideraciones de Rendimiento
 - **Interceptores**: Pueden agregar latencia a las solicitudes
 - **Búsqueda Semántica**: Puede requerir tiempo adicional de procesamiento
+- **Listado Dinámico**: Targets con `listing_mode = "DYNAMIC"` agregan latencia al descubrimiento de herramientas ya que cada list call se envía al MCP server en tiempo real
 - **Múltiples Targets**: Configuraciones complejas pueden afectar el tiempo de despliegue
 - **Validaciones**: Múltiples validaciones pueden ralentizar `terraform plan`
 

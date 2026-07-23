@@ -21,12 +21,11 @@ locals {
     for key, config in var.gateways : key => merge(config, {
       # Aplicar valores por defecto si no están especificados
       protocol_type     = try(config.protocol_type, "MCP")
-      exception_level   = try(config.exception_level, "ERROR")
+      exception_level   = try(config.exception_level, null)
       enable_encryption = try(config.enable_encryption, true)
 
       # Configuración del protocolo con valores por defecto
       protocol_config = config.protocol_config != null ? merge({
-        search_type        = "SEMANTIC"
         supported_versions = ["2025-03-26"]
       }, config.protocol_config) : null
     })

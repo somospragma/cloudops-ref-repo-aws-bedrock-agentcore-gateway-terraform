@@ -37,7 +37,7 @@ variable "gateways" {
     description       = string
     authorizer_type   = string
     protocol_type     = optional(string, "MCP")
-    exception_level   = optional(string, "DEBUG")
+    exception_level   = optional(string) # "DEBUG" o null. Establezca "DEBUG" para mensajes de error detallados.
     enable_encryption = optional(bool, true)
 
     # Configuración JWT (requerida cuando authorizer_type = "CUSTOM_JWT")
@@ -60,7 +60,7 @@ variable "gateways" {
     # Configuración del protocolo MCP
     protocol_config = optional(object({
       instructions       = optional(string)
-      search_type        = optional(string, "SEMANTIC")
+      search_type        = optional(string) # "SEMANTIC" o null. Omitir para gateways con targets DYNAMIC.
       supported_versions = optional(list(string), ["2025-03-26"])
     }))
 
@@ -81,6 +81,7 @@ variable "gateways" {
 
       # Para targets MCP Server
       mcp_endpoint = optional(string)
+      listing_mode = optional(string, "DEFAULT") # "DEFAULT" o "DYNAMIC" - Modo de listado para targets MCP Server
 
       # Para targets OpenAPI/Smithy
       schema_config = optional(object({
@@ -175,6 +176,13 @@ variable "gateways" {
 
   validation {
     condition = alltrue([
+      for k, v in var.gateways : v.exception_level == null || v.exception_level == "DEBUG"
+    ])
+    error_message = "exception_level solo acepta el valor 'DEBUG' o null (omitido). No existen otros valores válidos."
+  }
+
+  validation {
+    condition = alltrue([
       for k, v in var.gateways : contains(["CUSTOM_JWT", "AWS_IAM"], v.authorizer_type)
     ])
     error_message = "El tipo de autorizador debe ser 'CUSTOM_JWT' o 'AWS_IAM'."
@@ -227,6 +235,27 @@ variable "gateways" {
       ])
     ])
     error_message = "grant_type debe ser 'CLIENT_CREDENTIALS', 'AUTHORIZATION_CODE' o 'TOKEN_EXCHANGE'."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.gateways : alltrue([
+        for tk, tv in coalesce(v.targets, {}) :
+        tv.type != "mcp_server" || contains(["DEFAULT", "DYNAMIC"], coalesce(tv.listing_mode, "DEFAULT"))
+      ])
+    ])
+    error_message = "listing_mode debe ser 'DEFAULT' o 'DYNAMIC' para targets de tipo mcp_server."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.gateways :
+      try(v.protocol_config.search_type, null) == null || !anytrue([
+        for tk, tv in coalesce(v.targets, {}) :
+        tv.type == "mcp_server" && coalesce(tv.listing_mode, "DEFAULT") == "DYNAMIC"
+      ])
+    ])
+    error_message = "Los targets con listing_mode 'DYNAMIC' no son compatibles con search_type 'SEMANTIC'. Omita search_type del protocol_config del gateway o use listing_mode 'DEFAULT' en los targets MCP server."
   }
 }
 
