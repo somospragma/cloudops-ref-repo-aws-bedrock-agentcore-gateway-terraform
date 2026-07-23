@@ -102,7 +102,7 @@ module "bedrock_agentcore_gateway" {
       description       = "Gateway principal para agentes AI"
       authorizer_type   = "CUSTOM_JWT"
       protocol_type     = "MCP"
-      exception_level   = "ERROR"
+      exception_level   = "DEBUG"
       enable_encryption = true
       
       jwt_config = {
@@ -187,7 +187,7 @@ gateways = {
     description       = string                    # Descripción del gateway
     authorizer_type   = string                    # "CUSTOM_JWT" o "AWS_IAM"
     protocol_type     = optional(string, "MCP")  # Tipo de protocolo
-    exception_level   = optional(string, "ERROR") # Nivel de excepciones
+    exception_level   = optional(string)         # "DEBUG" o null (omitido = mensajes sanitizados)
     enable_encryption = optional(bool, true)     # Habilitar cifrado
     
     # Configuración JWT (requerida para CUSTOM_JWT)
@@ -760,6 +760,103 @@ module "dynamic_gateway" {
 3. **Implementar Interceptores**: Para logging y monitoreo de compliance
 4. **Validar Esquemas**: Asegurar que no se expongan datos sensibles
 5. **Monitorear Accesos**: Usar CloudTrail y CloudWatch para auditoría
+
+## Guía de Migración
+
+### Migrar de `listing_mode = "DYNAMIC"` a `"DEFAULT"` con Búsqueda Semántica
+
+La API de AWS **no permite** habilitar `search_type = "SEMANTIC"` en un gateway que ya tiene targets asociados. Esta es una restricción del servicio que aplica independientemente del `listing_mode` actual de los targets.
+
+Si necesita migrar un gateway existente (sin búsqueda semántica) a uno con `search_type = "SEMANTIC"`, debe seguir un proceso de **3 pasos con terraform apply separados**:
+
+#### Opción A: Migración sin Downtime del Gateway (3 applies)
+
+**Paso 1** — Eliminar todos los targets del gateway:
+
+```hcl
+gateways = {
+  my_gateway = {
+    # ... configuración del gateway sin cambios
+    protocol_config = {
+      instructions       = "..."
+      # search_type aún omitido
+      supported_versions = ["2025-03-26"]
+    }
+    targets = {}  # <-- Vaciar targets
+  }
+}
+```
+
+```bash
+terraform apply
+```
+
+**Paso 2** — Habilitar búsqueda semántica (gateway sin targets):
+
+```hcl
+gateways = {
+  my_gateway = {
+    # ... configuración del gateway
+    protocol_config = {
+      instructions       = "..."
+      search_type        = "SEMANTIC"  # <-- Ahora sí es posible
+      supported_versions = ["2025-03-26"]
+    }
+    targets = {}  # Aún vacío
+  }
+}
+```
+
+```bash
+terraform apply
+```
+
+**Paso 3** — Re-agregar los targets con `listing_mode = "DEFAULT"`:
+
+```hcl
+gateways = {
+  my_gateway = {
+    # ... configuración del gateway con SEMANTIC
+    protocol_config = {
+      instructions       = "..."
+      search_type        = "SEMANTIC"
+      supported_versions = ["2025-03-26"]
+    }
+    targets = {
+      mcp_server = {
+        type         = "mcp_server"
+        listing_mode = "DEFAULT"  # Compatible con SEMANTIC
+        mcp_endpoint = "https://..."
+        credential_provider = { type = "gateway_iam_role" }
+      }
+    }
+  }
+}
+```
+
+```bash
+terraform apply
+```
+
+#### Opción B: Recreación del Gateway (1 apply, con downtime)
+
+Si el downtime es aceptable, puede forzar la recreación del gateway. Esto lo crea desde cero con SEMANTIC habilitado:
+
+```bash
+terraform apply -replace='module.agentcore_gateway[0].aws_bedrockagentcore_gateway.this["my_key"]'
+```
+
+> ⚠️ **Advertencia**: Esto cambia el `gateway_id` y la `gateway_url`. Todos los clientes que apuntan al gateway deben actualizarse.
+
+#### Restricciones de la API de AWS
+
+| Operación | ¿Permitida? | Notas |
+|-----------|:-----------:|-------|
+| Crear gateway con `search_type = "SEMANTIC"` | ✅ | Debe hacerse al crear el gateway |
+| Agregar targets a gateway con SEMANTIC | ✅ | Los targets se indexan automáticamente |
+| Actualizar gateway a SEMANTIC **sin** targets | ✅ | Gateway debe tener 0 targets |
+| Actualizar gateway a SEMANTIC **con** targets | ❌ | `ValidationException` |
+| Target DYNAMIC en gateway con SEMANTIC | ❌ | DYNAMIC no es compatible con búsqueda semántica |
 
 ## Observaciones
 

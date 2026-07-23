@@ -37,7 +37,7 @@ variable "gateways" {
     description       = string
     authorizer_type   = string
     protocol_type     = optional(string, "MCP")
-    exception_level   = optional(string, "DEBUG")
+    exception_level   = optional(string) # "DEBUG" o null. Establezca "DEBUG" para mensajes de error detallados.
     enable_encryption = optional(bool, true)
 
     # Configuración JWT (requerida cuando authorizer_type = "CUSTOM_JWT")
@@ -173,6 +173,13 @@ variable "gateways" {
   }))
 
   description = "Configuración de los gateways de Bedrock AgentCore a crear"
+
+  validation {
+    condition = alltrue([
+      for k, v in var.gateways : v.exception_level == null || v.exception_level == "DEBUG"
+    ])
+    error_message = "exception_level solo acepta el valor 'DEBUG' o null (omitido). No existen otros valores válidos."
+  }
 
   validation {
     condition = alltrue([

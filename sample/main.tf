@@ -20,7 +20,7 @@ module "bedrock_agentcore_gateway" {
       description       = "Gateway principal para agentes AI con autorización JWT"
       authorizer_type   = "CUSTOM_JWT"
       protocol_type     = "MCP"
-      exception_level   = "ERROR"
+      exception_level   = "DEBUG"
       enable_encryption = true
 
       # Configuración JWT
@@ -150,7 +150,6 @@ module "bedrock_agentcore_gateway" {
       description       = "Gateway secundario con autorización IAM"
       authorizer_type   = "AWS_IAM"
       protocol_type     = "MCP"
-      exception_level   = "WARN"
       enable_encryption = false
 
       # Sin configuración JWT para autorización IAM
