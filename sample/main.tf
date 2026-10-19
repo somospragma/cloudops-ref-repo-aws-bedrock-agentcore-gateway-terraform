@@ -182,6 +182,59 @@ module "bedrock_agentcore_gateway" {
         Type    = "Secondary"
       }
     }
+
+    # Gateway con sesiones MCP habilitadas (retorna el header Mcp-Session-Id)
+    sessions = {
+      description       = "Gateway con sesiones MCP habilitadas y streaming de respuesta"
+      authorizer_type   = "AWS_IAM"
+      protocol_type     = "MCP"
+      enable_encryption = false
+
+      # Sin configuración JWT para autorización IAM
+      jwt_config = null
+
+      # Configuración del protocolo con sesiones y streaming
+      protocol_config = {
+        instructions       = "Gateway con estado de sesión y streaming de respuesta"
+        supported_versions = ["2025-03-26", "2025-06-18"]
+
+        # Al habilitar sesiones, el gateway genera y retorna el header Mcp-Session-Id
+        # en el primer initialize. Rango del timeout: 900-28800 segundos (default 3600).
+        session_configuration = {
+          session_timeout_in_seconds = 3600
+        }
+
+        # Requerido para elicitation/sampling
+        streaming_configuration = {
+          enable_response_streaming = true
+        }
+      }
+
+      targets = {
+        # Target MCP Server con sesiones
+        session_tools = {
+          type         = "mcp_server"
+          description  = "Servidor MCP con sesiones habilitadas"
+          mcp_endpoint = "https://mcp.internal.example.com/mcp"
+
+          credential_provider = {
+            type = "gateway_iam_role"
+          }
+
+          # IMPORTANTE: con sesiones habilitadas NO se debe incluir Mcp-Session-Id
+          # en metadata_configuration; AWS lo gestiona internamente (HTTP 400 en caso contrario).
+          metadata_configuration = {
+            allowed_request_headers  = ["Authorization"]
+            allowed_response_headers = []
+          }
+        }
+      }
+
+      additional_tags = {
+        Purpose = "Sessions"
+        Type    = "Sessions"
+      }
+    }
   }
 
   # Dependencias externas (PC-IAC-023)
