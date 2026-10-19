@@ -62,6 +62,15 @@ variable "gateways" {
       instructions       = optional(string)
       search_type        = optional(string) # "SEMANTIC" o null. Omitir para gateways con targets DYNAMIC.
       supported_versions = optional(list(string), ["2025-03-26"])
+
+      # Configuración de sesiones MCP (genera y retorna el header Mcp-Session-Id)
+      session_configuration = optional(object({
+        session_timeout_in_seconds = optional(number, 3600) # Rango 900-28800; default 3600 (1 h)
+      }))
+      # Configuración de streaming de respuesta (requerido para elicitation/sampling)
+      streaming_configuration = optional(object({
+        enable_response_streaming = optional(bool, false)
+      }))
     }))
 
     # Configuración de interceptores
@@ -256,6 +265,33 @@ variable "gateways" {
       ])
     ])
     error_message = "Los targets con listing_mode 'DYNAMIC' no son compatibles con search_type 'SEMANTIC'. Omita search_type del protocol_config del gateway o use listing_mode 'DEFAULT' en los targets MCP server."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.gateways :
+      try(v.protocol_config.session_configuration, null) == null ||
+      try(v.protocol_config.session_configuration.session_timeout_in_seconds, null) == null ||
+      (
+        v.protocol_config.session_configuration.session_timeout_in_seconds >= 900 &&
+        v.protocol_config.session_configuration.session_timeout_in_seconds <= 28800
+      )
+    ])
+    error_message = "session_timeout_in_seconds debe estar entre 900 (15 min) y 28800 (8 h) segundos cuando se habilita session_configuration."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.gateways :
+      try(v.protocol_config.session_configuration, null) == null || alltrue([
+        for tk, tv in coalesce(v.targets, {}) :
+        tv.metadata_configuration == null || (
+          !contains([for h in coalesce(tv.metadata_configuration.allowed_request_headers, []) : lower(h)], "mcp-session-id") &&
+          !contains([for h in coalesce(tv.metadata_configuration.allowed_response_headers, []) : lower(h)], "mcp-session-id")
+        )
+      ])
+    ])
+    error_message = "Cuando session_configuration está habilitado en el gateway, ningún target puede incluir 'Mcp-Session-Id' en allowed_request_headers ni allowed_response_headers de metadata_configuration; AWS lo gestiona internamente y devolvería HTTP 400 Bad Request."
   }
 }
 

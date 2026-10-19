@@ -212,6 +212,15 @@ gateways = {
       instructions       = string         # Instrucciones del protocolo
       search_type        = string         # Tipo de búsqueda ("SEMANTIC")
       supported_versions = list(string)   # Versiones soportadas
+
+      # Sesiones MCP: al habilitarse, el gateway genera y retorna el header Mcp-Session-Id
+      session_configuration = optional(object({
+        session_timeout_in_seconds = optional(number, 3600)  # Rango 900-28800; default 3600 (1 h)
+      }))
+      # Streaming de respuesta (requisito para elicitation/sampling)
+      streaming_configuration = optional(object({
+        enable_response_streaming = optional(bool, false)
+      }))
     }))
     
     # Configuración de interceptores
@@ -662,6 +671,74 @@ module "dynamic_gateway" {
 | Rendimiento de listado | Rápido (desde caché) | Depende de latencia del MCP server |
 | Sincronización | Automática en create/update + `SynchronizeGatewayTargets` API | No aplica |
 
+### Ejemplo 5: Gateway con Sesiones MCP habilitadas
+
+Al habilitar `session_configuration`, el gateway genera un identificador de sesión en el primer `initialize` del cliente MCP y lo retorna en el header de respuesta `Mcp-Session-Id`. El cliente reutiliza ese valor en solicitudes posteriores para mantener el estado de la sesión. Las sesiones son prerequisito de elicitation/sampling, que además requieren `streaming_configuration.enable_response_streaming = true`.
+
+- `session_timeout_in_seconds` es opcional; rango válido **900–28800** segundos; default **3600** (1 h).
+- **RESTRICCIÓN**: con sesiones habilitadas, ningún target puede incluir `Mcp-Session-Id` en `allowed_request_headers` ni `allowed_response_headers` de `metadata_configuration`. AWS gestiona ese header internamente y devolvería `HTTP 400 Bad Request`. El módulo valida esta restricción.
+
+> Referencia: [Gateway sessions (AWS docs)](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-sessions.html)
+
+```hcl
+module "sessions_gateway" {
+  source = "../"
+
+  providers = {
+    aws.project = aws.principal
+  }
+
+  client      = "corp"
+  project     = "assistant"
+  environment = "pdn"
+
+  gateways = {
+    sessions = {
+      description     = "Gateway con sesiones MCP habilitadas"
+      authorizer_type = "AWS_IAM"
+
+      # Habilitar sesiones y streaming de respuesta
+      protocol_config = {
+        instructions       = "Gateway con estado de sesión y streaming"
+        supported_versions = ["2025-03-26", "2025-06-18"]
+
+        # El gateway retornará el header Mcp-Session-Id en el primer initialize
+        session_configuration = {
+          session_timeout_in_seconds = 3600 # 1 h (rango 900-28800)
+        }
+
+        # Requerido para elicitation/sampling
+        streaming_configuration = {
+          enable_response_streaming = true
+        }
+      }
+
+      targets = {
+        tools = {
+          type         = "mcp_server"
+          description  = "Servidor MCP con sesiones"
+          mcp_endpoint = "https://tools.corp.com/mcp"
+
+          credential_provider = {
+            type = "gateway_iam_role"
+          }
+
+          # IMPORTANTE: NO incluir Mcp-Session-Id en metadata_configuration
+          # (AWS lo gestiona internamente; de lo contrario HTTP 400 Bad Request)
+          metadata_configuration = {
+            allowed_request_headers  = ["Authorization"]
+            allowed_response_headers = []
+          }
+        }
+      }
+    }
+  }
+
+  gateway_role_arn = data.aws_iam_role.gateway.arn
+  kms_key_arn      = data.aws_kms_key.encryption.arn
+}
+```
+
 ## Escenarios de Uso Comunes
 
 ### 1. Chatbot Empresarial con IA
@@ -700,6 +777,13 @@ module "dynamic_gateway" {
 - **Listado Dinámico**: El MCP server filtra herramientas según la identidad del usuario
 - **search_type**: Omitido (requerido para compatibilidad con DYNAMIC)
 - **Caso de uso**: Aplicaciones SaaS donde cada tenant ve solo sus herramientas autorizadas
+
+### 7. Asistente Conversacional con Estado de Sesión
+- **Gateway**: `session_configuration` habilitado para mantener el contexto entre solicitudes
+- **Header**: El gateway genera y retorna `Mcp-Session-Id` en el primer `initialize`
+- **Streaming**: `streaming_configuration.enable_response_streaming = true` para elicitation/sampling
+- **Restricción**: Los targets no deben declarar `Mcp-Session-Id` en `metadata_configuration` (HTTP 400)
+- **Timeout**: `session_timeout_in_seconds` entre 900 y 28800 (default 3600)
 
 ## Seguridad y Cumplimiento
 

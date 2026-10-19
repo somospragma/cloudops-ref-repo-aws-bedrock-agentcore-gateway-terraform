@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for `default_return_url` in OAuth credential provider (required for `AUTHORIZATION_CODE` grant type)
 - Support for `listing_mode` in MCP server targets (`DEFAULT` or `DYNAMIC`). DEFAULT caches capabilities for semantic search; DYNAMIC forwards list calls live to the MCP server for per-user tool discovery
 - Validation: `listing_mode = "DYNAMIC"` is incompatible with `search_type = "SEMANTIC"` at the gateway level
+- Support for `session_configuration` in `protocol_config` (with `session_timeout_in_seconds`, range 900–28800, default 3600) to enable MCP sessions. When enabled, the gateway generates and returns the `Mcp-Session-Id` response header on the first `initialize`
+- Support for `streaming_configuration` in `protocol_config` (with `enable_response_streaming`), a prerequisite for elicitation/sampling
+- Validation: `session_timeout_in_seconds` must be between 900 and 28800 when `session_configuration` is set
+- Validation: `Mcp-Session-Id` is not allowed in a target's `metadata_configuration` (`allowed_request_headers`/`allowed_response_headers`) when the gateway has sessions enabled, avoiding HTTP 400 Bad Request
 
 ### Changed
 - `search_type` in `protocol_config` no longer defaults to `"SEMANTIC"`. It must be explicitly set to enable semantic search. This enables gateways with DYNAMIC targets to be created without conflicts. Existing configurations that explicitly set `search_type = "SEMANTIC"` are unaffected.

@@ -58,6 +58,24 @@ resource "aws_bedrockagentcore_gateway" "this" {
         instructions       = protocol_configuration.value.instructions
         search_type        = protocol_configuration.value.search_type
         supported_versions = protocol_configuration.value.supported_versions
+
+        # Configuración de sesiones MCP (habilita generación del header Mcp-Session-Id)
+        dynamic "session_configuration" {
+          for_each = protocol_configuration.value.session_configuration != null ? [protocol_configuration.value.session_configuration] : []
+
+          content {
+            session_timeout_in_seconds = session_configuration.value.session_timeout_in_seconds
+          }
+        }
+
+        # Configuración de streaming de respuesta (requerido para elicitation/sampling)
+        dynamic "streaming_configuration" {
+          for_each = protocol_configuration.value.streaming_configuration != null ? [protocol_configuration.value.streaming_configuration] : []
+
+          content {
+            enable_response_streaming = streaming_configuration.value.enable_response_streaming
+          }
+        }
       }
     }
   }
