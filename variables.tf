@@ -285,10 +285,8 @@ variable "gateways" {
       for k, v in var.gateways :
       try(v.protocol_config.session_configuration, null) == null || alltrue([
         for tk, tv in coalesce(v.targets, {}) :
-        tv.metadata_configuration == null || (
-          !contains([for h in coalesce(tv.metadata_configuration.allowed_request_headers, []) : lower(h)], "mcp-session-id") &&
-          !contains([for h in coalesce(tv.metadata_configuration.allowed_response_headers, []) : lower(h)], "mcp-session-id")
-        )
+        !contains([for h in try(tv.metadata_configuration.allowed_request_headers, []) : lower(h)], "mcp-session-id") &&
+        !contains([for h in try(tv.metadata_configuration.allowed_response_headers, []) : lower(h)], "mcp-session-id")
       ])
     ])
     error_message = "Cuando session_configuration está habilitado en el gateway, ningún target puede incluir 'Mcp-Session-Id' en allowed_request_headers ni allowed_response_headers de metadata_configuration; AWS lo gestiona internamente y devolvería HTTP 400 Bad Request."
