@@ -76,7 +76,7 @@ cloudops-ref-repo-aws-bedrock-agentcore-gateway-terraform/
 ### Requisitos Previos
 
 - **Terraform**: >= 1.0.0
-- **AWS Provider**: >= 4.31.0
+- **AWS Provider**: >= 6.50.0
 - **Rol IAM**: Con permisos para Bedrock AgentCore (proporcionado externamente)
 - **Clave KMS**: Opcional, para cifrado personalizado (proporcionada externamente)
 - **Funciones Lambda**: Deben existir previamente para targets Lambda
@@ -189,6 +189,7 @@ gateways = {
     protocol_type     = optional(string, "MCP")  # Tipo de protocolo
     exception_level   = optional(string)         # "DEBUG" o null (omitido = mensajes sanitizados)
     enable_encryption = optional(bool, true)     # Habilitar cifrado
+    web_acl_arn       = optional(string)         # ARN de Web ACL WAFv2 REGIONAL a asociar (opcional)
     
     # Configuración JWT (requerida para CUSTOM_JWT)
     jwt_config = optional(object({
@@ -274,6 +275,7 @@ gateways = {
 | `gateway_arns_by_key` | `map(string)` | Mapa de ARNs indexados por clave |
 | `gateway_ids_by_key` | `map(string)` | Mapa de IDs indexados por clave |
 | `gateway_urls_by_key` | `map(string)` | Mapa de URLs indexados por clave |
+| `web_acl_associations` | `map(string)` | Mapa de ARNs de Web ACL WAF asociados, por clave de gateway |
 | `target_ids` | `list(string)` | IDs de los targets creados |
 | `target_ids_by_key` | `map(string)` | Mapa de IDs de targets por clave compuesta |
 | `workload_identity_arns` | `map(string)` | ARNs de identidades de workload |
@@ -792,6 +794,7 @@ module "sessions_gateway" {
 #### Cifrado y Protección de Datos
 - **Cifrado en Reposo**: Habilitado por defecto con `enable_encryption = true`
 - **KMS Customer-Managed**: Soporte para claves KMS gestionadas por el cliente
+- **AWS WAF**: Asociación opcional de un Web ACL REGIONAL por gateway con `web_acl_arn` (el Web ACL se gestiona fuera del módulo; modo de fallo AWS por defecto `FAIL_CLOSE`, no configurable aún en el provider). Requiere permisos `wafv2:AssociateWebACL`, `wafv2:DisassociateWebACL`, `wafv2:GetWebACLForResource`, `wafv2:ListResourcesForWebACL` y `bedrock-agentcore:Gateway{Associate,Disassociate,Get,List}WebACL*`.
 - **Protección de Eliminación**: `prevent_destroy = true` en recursos críticos
 - **Separación de Responsabilidades**: Claves KMS gestionadas externamente
 

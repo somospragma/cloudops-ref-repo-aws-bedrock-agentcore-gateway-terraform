@@ -40,6 +40,10 @@ variable "gateways" {
     exception_level   = optional(string) # "DEBUG" o null. Establezca "DEBUG" para mensajes de error detallados.
     enable_encryption = optional(bool, true)
 
+    # ARN de un AWS WAFv2 Web ACL REGIONAL a asociar al gateway (opcional).
+    # Un gateway admite como máximo un Web ACL; un Web ACL puede asociarse a varios gateways.
+    web_acl_arn = optional(string)
+
     # Configuración JWT (requerida cuando authorizer_type = "CUSTOM_JWT")
     jwt_config = optional(object({
       discovery_url    = string
@@ -203,6 +207,14 @@ variable "gateways" {
       v.authorizer_type != "CUSTOM_JWT" || v.jwt_config != null
     ])
     error_message = "jwt_config es requerido cuando authorizer_type es 'CUSTOM_JWT'."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.gateways :
+      v.web_acl_arn == null || can(regex("^arn:aws[a-z-]*:wafv2:[a-z0-9-]+:[0-9]{12}:regional/webacl/[^/]+/[a-f0-9-]+$", v.web_acl_arn))
+    ])
+    error_message = "web_acl_arn debe ser el ARN de un Web ACL de WAFv2 de alcance REGIONAL (arn:aws:wafv2:<region>:<cuenta>:regional/webacl/<nombre>/<id>). Los Web ACL de CloudFront (global) no están soportados por AgentCore Gateway."
   }
 
   validation {

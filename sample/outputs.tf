@@ -37,6 +37,12 @@ output "target_ids_by_key" {
   value       = module.bedrock_agentcore_gateway.target_ids_by_key
 }
 
+# Web ACL de WAF asociados
+output "web_acl_associations" {
+  description = "ARNs de los Web ACL de WAF asociados por clave de gateway"
+  value       = module.bedrock_agentcore_gateway.web_acl_associations
+}
+
 # Identidades de workload
 output "workload_identity_arns" {
   description = "ARNs de las identidades de workload"

@@ -118,6 +118,18 @@ resource "aws_bedrockagentcore_gateway" "this" {
   # }
 }
 
+# Asociación de AWS WAFv2 Web ACL al Gateway (PC-IAC-005, PC-IAC-010, PC-IAC-023)
+# Solo se crea para los gateways que definan web_acl_arn. El Web ACL debe ser REGIONAL
+# y existir en la misma región del gateway. Se gestiona fuera del módulo (dominio de Seguridad).
+resource "aws_wafv2_web_acl_association" "this" {
+  provider = aws.project # Referencia explícita al alias (PC-IAC-005)
+
+  for_each = local.gateways_with_waf
+
+  resource_arn = aws_bedrockagentcore_gateway.this[each.key].gateway_arn
+  web_acl_arn  = each.value.web_acl_arn
+}
+
 # Gateway Targets (PC-IAC-010, PC-IAC-014, PC-IAC-023)
 resource "aws_bedrockagentcore_gateway_target" "this" {
   provider = aws.project # Referencia explícita al alias (PC-IAC-005)

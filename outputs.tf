@@ -56,6 +56,14 @@ output "target_ids_by_key" {
   }
 }
 
+# Web ACL de WAF asociado por gateway (PC-IAC-007)
+output "web_acl_associations" {
+  description = "Mapa de ARNs de Web ACL de WAFv2 asociados, indexado por clave de gateway (solo gateways con WAF)"
+  value = {
+    for key, association in aws_wafv2_web_acl_association.this : key => association.web_acl_arn
+  }
+}
+
 # Detalles de identidad de workload (PC-IAC-007)
 output "workload_identity_arns" {
   description = "ARNs de las identidades de workload de los gateways"

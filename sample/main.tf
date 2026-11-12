@@ -23,6 +23,10 @@ module "bedrock_agentcore_gateway" {
       exception_level   = "DEBUG"
       enable_encryption = true
 
+      # Asociación opcional de AWS WAF (Web ACL REGIONAL, uno por gateway).
+      # Con null no se crea la asociación.
+      web_acl_arn = var.web_acl_name != null ? data.aws_wafv2_web_acl.gateway_waf[0].arn : null
+
       # Configuración JWT
       jwt_config = {
         discovery_url    = var.jwt_discovery_url
