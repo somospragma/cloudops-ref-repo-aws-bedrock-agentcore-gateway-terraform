@@ -8,8 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Support for associating an AWS WAFv2 Web ACL to a gateway through the optional `web_acl_arn` attribute in each `gateways` entry. Creates an `aws_wafv2_web_acl_association` using the gateway ARN as `resource_arn`. The Web ACL must be REGIONAL and in the same region as the gateway; it is managed outside the module. One gateway supports at most one Web ACL.
-- Validation: `web_acl_arn` must be a REGIONAL WAFv2 Web ACL ARN.
+- Support for associating an AWS WAFv2 Web ACL to a gateway through the optional `web_acl_arns` variable (map of gateway key => Web ACL ARN). Creates an `aws_wafv2_web_acl_association` using the gateway ARN as `resource_arn`. The Web ACL must be REGIONAL and in the same region as the gateway; it is managed outside the module. One gateway supports at most one Web ACL. The map keys must be known at plan time, while the ARN values may be computed during apply (for example, a Web ACL created in the same run). A per-gateway attribute is intentionally not used because filtering gateways by an unknown ARN makes `for_each` keys unknown.
+- Validation: each `web_acl_arns` value must be a REGIONAL WAFv2 Web ACL ARN; keys must exist in `gateways`.
 - New output `web_acl_associations` (map of Web ACL ARN by gateway key).
 - Note: the WAF failure mode (`FAIL_CLOSE`/`FAIL_OPEN`, `wafConfiguration` in the AWS API) is not exposed by the AWS provider yet, so the AWS default (`FAIL_CLOSE`) applies.
 - Initial release of Amazon Bedrock AgentCore Gateway module
