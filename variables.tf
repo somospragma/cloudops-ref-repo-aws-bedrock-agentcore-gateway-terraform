@@ -314,3 +314,21 @@ variable "kms_key_arn" {
     error_message = "El ARN de la clave KMS debe tener el formato válido de ARN de KMS key."
   }
 }
+
+# Asociación de AWS WAFv2 Web ACL a gateways (PC-IAC-023)
+# Mapa clave de gateway => ARN del Web ACL REGIONAL. Las CLAVES deben ser conocidas al planificar
+# (por ejemplo, definidas estáticamente o derivadas de una variable); los VALORES pueden ser
+# desconocidos hasta el apply, p. ej. el ARN de un Web ACL creado en la misma ejecución.
+variable "web_acl_arns" {
+  type        = map(string)
+  description = "Mapa clave de gateway => ARN de un Web ACL de WAFv2 REGIONAL a asociar. Un gateway admite como máximo un Web ACL; un Web ACL puede asociarse a varios gateways. Las claves deben existir en var.gateways y ser conocidas en el plan."
+  default     = {}
+
+  validation {
+    condition = alltrue([
+      for k, v in var.web_acl_arns :
+      can(regex("^arn:aws[a-z-]*:wafv2:[a-z0-9-]+:[0-9]{12}:regional/webacl/[^/]+/[a-f0-9-]+$", v))
+    ])
+    error_message = "Cada valor de web_acl_arns debe ser el ARN de un Web ACL de WAFv2 de alcance REGIONAL (arn:aws:wafv2:<region>:<cuenta>:regional/webacl/<nombre>/<id>). Los Web ACL de CloudFront (global) no están soportados por AgentCore Gateway."
+  }
+}

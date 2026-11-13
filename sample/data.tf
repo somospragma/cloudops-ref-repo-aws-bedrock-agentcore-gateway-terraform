@@ -16,6 +16,14 @@ data "aws_lambda_function" "processor" {
   function_name = var.lambda_function_name
 }
 
+# Buscar el Web ACL de WAFv2 REGIONAL si se especifica (opcional, gestionado por Seguridad)
+# Debe existir en la misma región del gateway. Los Web ACL de CloudFront no son soportados.
+data "aws_wafv2_web_acl" "gateway_waf" {
+  count = var.web_acl_name != null ? 1 : 0
+  name  = var.web_acl_name
+  scope = "REGIONAL"
+}
+
 # Buscar la clave KMS si se especifica (opcional)
 data "aws_kms_key" "gateway_key" {
   count  = var.kms_key_id != null ? 1 : 0

@@ -40,6 +40,12 @@ variable "kms_key_id" {
   default     = null
 }
 
+variable "web_acl_name" {
+  type        = string
+  description = "Nombre del Web ACL de WAFv2 REGIONAL existente a asociar al gateway principal (opcional)"
+  default     = null
+}
+
 # Variables de Configuración JWT
 variable "jwt_discovery_url" {
   type        = string
