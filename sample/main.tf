@@ -23,6 +23,12 @@ module "bedrock_agentcore_gateway" {
       exception_level   = "DEBUG"
       enable_encryption = true
 
+      # KMS propia del gateway (null = clave administrada por AWS)
+      kms_key_arn = var.kms_key_id != null ? data.aws_kms_key.gateway_key[0].arn : null
+
+      # Asociación opcional de AWS WAF (Web ACL REGIONAL, uno por gateway). Con null no se asocia.
+      web_acl = var.web_acl_name != null ? { arn = data.aws_wafv2_web_acl.gateway_waf[0].arn } : null
+
       # Configuración JWT
       jwt_config = {
         discovery_url    = var.jwt_discovery_url
@@ -237,11 +243,6 @@ module "bedrock_agentcore_gateway" {
     }
   }
 
-  # Asociación opcional de AWS WAF (Web ACL REGIONAL, uno por gateway).
-  # Las claves del mapa deben ser estáticas; con {} no se crea ninguna asociación.
-  web_acl_arns = var.web_acl_name != null ? { main = data.aws_wafv2_web_acl.gateway_waf[0].arn } : {}
-
   # Dependencias externas (PC-IAC-023)
   gateway_role_arn = data.aws_iam_role.gateway_role.arn
-  kms_key_arn      = var.kms_key_id != null ? data.aws_kms_key.gateway_key[0].arn : null
 }

@@ -31,6 +31,13 @@ locals {
     })
   }
 
+  # Gateways con Web ACL de WAF asociado (PC-IAC-010)
+  # Se filtra por la presencia del objeto web_acl y no por su ARN, que puede ser desconocido en el plan.
+  gateways_with_waf = {
+    for key, config in local.gateways_with_defaults : key => config.web_acl
+    if config.web_acl != null
+  }
+
   # Aplanamiento de targets para iteración con for_each (PC-IAC-012)
   all_targets_flat = flatten([
     for gateway_key, gateway_config in local.gateways_with_defaults : [

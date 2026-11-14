@@ -8,8 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Support for associating an AWS WAFv2 Web ACL to a gateway through the optional `web_acl_arns` variable (map of gateway key => Web ACL ARN). Creates an `aws_wafv2_web_acl_association` using the gateway ARN as `resource_arn`. The Web ACL must be REGIONAL and in the same region as the gateway; it is managed outside the module. One gateway supports at most one Web ACL. The map keys must be known at plan time, while the ARN values may be computed during apply (for example, a Web ACL created in the same run). A per-gateway attribute is intentionally not used because filtering gateways by an unknown ARN makes `for_each` keys unknown.
-- Validation: each `web_acl_arns` value must be a REGIONAL WAFv2 Web ACL ARN; keys must exist in `gateways`.
+- Support for associating an AWS WAFv2 Web ACL to a gateway through the optional `web_acl` object (`web_acl = { arn = "..." }`) in each `gateways` entry. Creates an `aws_wafv2_web_acl_association` using the gateway ARN as `resource_arn`. The Web ACL must be REGIONAL and in the same region as the gateway; it is managed outside the module. One gateway supports at most one Web ACL. It is an object (not a plain string) on purpose: the module filters gateways by the presence of the object, which is known at plan time even when the ARN is computed during apply (for example, a Web ACL created in the same run). Filtering by an unknown string ARN would make the `for_each` keys unknown.
+- Validation: `web_acl.arn` must be a REGIONAL WAFv2 Web ACL ARN.
+- Support for a per-gateway KMS key through `kms_key_arn` in each `gateways` entry (applied when `enable_encryption = true`). It takes precedence over the global `kms_key_arn` variable.
 - New output `web_acl_associations` (map of Web ACL ARN by gateway key).
 - Note: the WAF failure mode (`FAIL_CLOSE`/`FAIL_OPEN`, `wafConfiguration` in the AWS API) is not exposed by the AWS provider yet, so the AWS default (`FAIL_CLOSE`) applies.
 - Initial release of Amazon Bedrock AgentCore Gateway module
@@ -32,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Validation: `Mcp-Session-Id` is not allowed in a target's `metadata_configuration` (`allowed_request_headers`/`allowed_response_headers`) when the gateway has sessions enabled, avoiding HTTP 400 Bad Request
 
 ### Changed
+- The global `kms_key_arn` variable is deprecated in favor of `kms_key_arn` inside each `gateways` entry. It still works as a default for gateways that do not define their own key.
 - Minimum AWS provider version raised from `>= 4.31.0` to `>= 6.50.0`. `aws_bedrockagentcore_gateway*` resources exist since 6.17.0, and the module uses `session_configuration`/`streaming_configuration` (6.49.0) and `listing_mode` (6.50.0).
 - `search_type` in `protocol_config` no longer defaults to `"SEMANTIC"`. It must be explicitly set to enable semantic search. This enables gateways with DYNAMIC targets to be created without conflicts. Existing configurations that explicitly set `search_type = "SEMANTIC"` are unaffected.
 - `exception_level` no longer defaults to `"DEBUG"`. The only valid value is `"DEBUG"` (to enable verbose error messages) or `null` (omitted, for sanitized messages in production). Invalid values like `"ERROR"` or `"WARN"` are now caught by validation.
