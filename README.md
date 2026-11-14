@@ -177,8 +177,7 @@ module "bedrock_agentcore_gateway" {
 | `environment` | `string` | ✅ | Entorno de despliegue | `dev`, `qa`, `pdn`, `prod` |
 | `gateways` | `map(object)` | ✅ | Configuración de los gateways | Ver estructura detallada |
 | `gateway_role_arn` | `string` | ✅ | ARN del rol IAM para el gateway | Formato ARN válido |
-| `kms_key_arn` | `string` | ❌ | ARN de la clave KMS para cifrado | Formato ARN válido |
-| `web_acl_arns` | `map(string)` | ❌ | Mapa clave de gateway => ARN de Web ACL WAFv2 REGIONAL a asociar | ARN REGIONAL; claves existentes en `gateways` y conocidas en el plan |
+| `kms_key_arn` | `string` | ❌ | **En desuso.** Use `kms_key_arn` dentro de cada gateway. ARN de la clave KMS para los gateways que no definan la suya | Formato ARN válido |
 
 ### Estructura de `gateways`
 
@@ -190,6 +189,10 @@ gateways = {
     protocol_type     = optional(string, "MCP")  # Tipo de protocolo
     exception_level   = optional(string)         # "DEBUG" o null (omitido = mensajes sanitizados)
     enable_encryption = optional(bool, true)     # Habilitar cifrado
+    kms_key_arn       = optional(string)         # KMS propia del gateway (si es null usa la variable global en desuso)
+    web_acl           = optional(object({        # Asociación de Web ACL WAFv2 REGIONAL (opcional)
+      arn = string
+    }))
     
     # Configuración JWT (requerida para CUSTOM_JWT)
     jwt_config = optional(object({
@@ -793,8 +796,8 @@ module "sessions_gateway" {
 
 #### Cifrado y Protección de Datos
 - **Cifrado en Reposo**: Habilitado por defecto con `enable_encryption = true`
-- **KMS Customer-Managed**: Soporte para claves KMS gestionadas por el cliente
-- **AWS WAF**: Asociación opcional de un Web ACL REGIONAL por gateway con la variable `web_acl_arns` (mapa clave de gateway => ARN; las claves deben ser conocidas en el plan, el ARN puede ser un valor calculado en el apply) (el Web ACL se gestiona fuera del módulo; modo de fallo AWS por defecto `FAIL_CLOSE`, no configurable aún en el provider). Requiere permisos `wafv2:AssociateWebACL`, `wafv2:DisassociateWebACL`, `wafv2:GetWebACLForResource`, `wafv2:ListResourcesForWebACL` y `bedrock-agentcore:Gateway{Associate,Disassociate,Get,List}WebACL*`.
+- **KMS Customer-Managed**: `kms_key_arn` por gateway (cada gateway puede usar su propia clave). La variable global `kms_key_arn` sigue disponible como valor por defecto, pero está en desuso
+- **AWS WAF**: Asociación opcional de un Web ACL REGIONAL por gateway con `web_acl = { arn = ... }` dentro de `gateways`. Es un objeto y no un string para que su presencia se conozca en el plan aunque el ARN se calcule en el `apply` (por ejemplo, un Web ACL creado en la misma ejecución). El Web ACL se gestiona fuera del módulo; modo de fallo AWS por defecto `FAIL_CLOSE`, no configurable aún en el provider. Requiere permisos `wafv2:AssociateWebACL`, `wafv2:DisassociateWebACL`, `wafv2:GetWebACLForResource`, `wafv2:ListResourcesForWebACL` y `bedrock-agentcore:Gateway{Associate,Disassociate,Get,List}WebACL*`.
 - **Protección de Eliminación**: `prevent_destroy = true` en recursos críticos
 - **Separación de Responsabilidades**: Claves KMS gestionadas externamente
 

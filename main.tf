@@ -100,7 +100,7 @@ resource "aws_bedrockagentcore_gateway" "this" {
   }
 
   # Seguridad: Cifrado en reposo (PC-IAC-020)
-  kms_key_arn = each.value.enable_encryption ? var.kms_key_arn : null
+  kms_key_arn = each.value.enable_encryption ? (each.value.kms_key_arn != null ? each.value.kms_key_arn : var.kms_key_arn) : null
 
   # Configuración de excepciones
   exception_level = each.value.exception_level
@@ -119,23 +119,16 @@ resource "aws_bedrockagentcore_gateway" "this" {
 }
 
 # Asociación de AWS WAFv2 Web ACL al Gateway (PC-IAC-005, PC-IAC-010, PC-IAC-023)
-# Solo se crea para las claves definidas en var.web_acl_arns. El Web ACL debe ser REGIONAL
+# Solo se crea para los gateways que definan web_acl. El Web ACL debe ser REGIONAL
 # y existir en la misma región del gateway. Se gestiona fuera del módulo (dominio de Seguridad).
-# El for_each usa las claves del mapa (conocidas en el plan); el ARN puede resolverse en el apply.
+# El for_each filtra por la presencia del objeto web_acl (conocida en el plan); su ARN puede resolverse en el apply.
 resource "aws_wafv2_web_acl_association" "this" {
   provider = aws.project # Referencia explícita al alias (PC-IAC-005)
 
-  for_each = var.web_acl_arns
+  for_each = local.gateways_with_waf
 
   resource_arn = aws_bedrockagentcore_gateway.this[each.key].gateway_arn
-  web_acl_arn  = each.value
-
-  lifecycle {
-    precondition {
-      condition     = contains(keys(var.gateways), each.key)
-      error_message = "La clave '${each.key}' de web_acl_arns no existe en gateways."
-    }
-  }
+  web_acl_arn  = each.value.arn
 }
 
 # Gateway Targets (PC-IAC-010, PC-IAC-014, PC-IAC-023)
